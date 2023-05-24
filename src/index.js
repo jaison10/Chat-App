@@ -1,45 +1,46 @@
-const express = require('express')
-const http = require('http')
 const path = require('path')
+const http = require('http')
+const express = require('express')
 const socketio = require('socket.io')
 const Filter = require('bad-words')
+const { generateMessage, generateLocationMessage } = require('./utils/messages')
 
 const app = express()
-const server = http.createServer(app) //when we do app.listen(), express creates an http server behind the scene but since socketio expects a server, 
-                                      // we create one explicitely and pass to socketio as well as call .listen() using the server.
-const io = socketio(server) 
+const server = http.createServer(app)
+const io = socketio(server)
 
 const port = process.env.PORT || 3000
-const publicDirPath = path.join(__dirname, '../public' )
+const publicDirectoryPath = path.join(__dirname, '../public')
 
-app.use(express.static(publicDirPath))
+app.use(express.static(publicDirectoryPath))
 
-server.listen(port, ()=>{  
-    console.log(`App running at ${port} successfully!`);
+io.on('connection', (socket) => {
+    console.log('New WebSocket connection')
+
+    socket.emit('message', generateMessage('Welcome!'))
+    socket.broadcast.emit('message', generateMessage('A new user has joined!'))
+
+    socket.on('sendMessage', (message, callback) => {
+        const filter = new Filter()
+
+        if (filter.isProfane(message)) {
+            return callback('Profanity is not allowed!')
+        }
+
+        io.emit('message', generateMessage(message))
+        callback()
+    })
+
+    socket.on('sendLocation', (coords, callback) => {
+        io.emit('locationMessage', generateLocationMessage(`https://google.com/maps?q=${coords.latitude},${coords.longitude}`))
+        callback()
+    })
+
+    socket.on('disconnect', () => {
+        io.emit('message', generateMessage('A user has left!'))
+    })
 })
 
-let userCount = 0
-io.on('connection', (socket) => {
-    console.log('---------------- STARTED!');
-
-    socket.broadcast.emit('SendUserMsg', {
-        msg : 'A user has been joined!',
-        joinedDateTime : new Date().getTime()
-    }) //this emits to all except the current user
-    
-    socket.on('MessageSent', (msg, callback)=>{
-        const filter = new Filter()
-        if(filter.isProfane(msg)){ //returns true is anything bad found.
-            return callback('Profanity not allowed')
-        }
-        socket.broadcast.emit('MessageReceived', msg)
-        callback('Message is delivered.') //runs the callback which is received in the place where this event was called
-    })
-
-    socket.on('disconnect', ()=>{
-        io.emit('SendUserMsg', 'A user has been left!')
-    })
-});
-
-
-
+server.listen(port, () => {
+    console.log(`Server is up on port ${port}!`)
+})
