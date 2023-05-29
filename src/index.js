@@ -23,8 +23,11 @@ io.on('connection', (socket) => {
         socket.emit('message', generateMessage('Welcome!'))
         socket.broadcast.to(room).emit('message', generateMessage(`${username} has joined!`))
 
-        // socket.emit, io.emit, socket.broadcast.emit
-        // io.to.emit, socket.broadcast.to.emit
+        // socket.emit - sends to current user
+        // io.emit - sends to all
+        // socket.broadcast.emit - sends to all except current user
+        // io.to.emit - sends to all with cond given inside to()
+        // socket.broadcast.to.emit - sends to all except current user with condition.
     })
 
     socket.on('sendMessage', (message, callback) => {
